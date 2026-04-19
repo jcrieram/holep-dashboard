@@ -210,6 +210,18 @@ def tab_resumen(df):
     c6.metric("Incontinencia", f"{incont}  ({incont/total*100:.1f}%)" if total else "0")
 
     st.markdown("---")
+
+    st.markdown("""
+<div style="background:#1c2a1c; border:1px solid #3fb950; border-radius:10px; padding:14px 18px; margin-bottom:16px;">
+<span style="color:#3fb950; font-weight:700; font-size:14px;">📋 Criterios de selección de pacientes</span><br>
+<span style="color:#c9d1d9; font-size:13px;">
+• <b>PSAt &lt; 4 ng/mL</b> → inclusión directa<br>
+• <b>Qmáx &lt; 11 mL/s</b> → inclusión directa<br>
+• <b>PSAt &gt; 4 ng/mL</b> → resonancia magnética de próstata preoperatoria requerida; inclusión solo si <b>PIRADS ≤ 2</b>
+</span>
+</div>
+""", unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
 
     with col1:
