@@ -209,6 +209,41 @@ def tab_resumen(df):
     c5.metric("Reingresos", f"{reing}  ({reing/total*100:.1f}%)" if total else "0")
     c6.metric("Incontinencia", f"{incont}  ({incont/total*100:.1f}%)" if total else "0")
 
+    # Segunda fila KPIs
+    coef_med = df["Coef_enucleacion"].mean() if df["Coef_enucleacion"].notna().any() else None
+    coef_ok  = coef_med is not None and coef_med >= 80
+    grandes  = int((df[cfg.COL_VOLUMEN] >= 100).sum())
+    outliers_t = int((df[cfg.COL_TIEMPO] > 120).sum()) if df[cfg.COL_TIEMPO].notna().any() else 0
+    rao_total  = int(df["RPM_es_RAO"].sum())
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Coef. enucleación medio",
+              f"{coef_med:.1f}%" if coef_med else "—",
+              "✓ meta ≥80%" if coef_ok else "< meta 80%")
+    k2.metric("Próstatas ≥ 100 gr", grandes)
+    k3.metric("Casos > 120 min", outliers_t, "revisar" if outliers_t > 0 else None)
+    k4.metric("RAO preoperatorio", rao_total, f"{rao_total/total*100:.1f}%" if total else None)
+
+    # Alertas outliers
+    mask_out = (
+        (df[cfg.COL_TIEMPO].fillna(0) > 120) |
+        df[cfg.COL_REINGRESO] |
+        (df["Coef_enucleacion"].fillna(100) < 50)
+    )
+    n_out = mask_out.sum()
+    if n_out > 0:
+        with st.expander(f"⚠️ Casos que requieren revisión — {n_out} encontrados", expanded=False):
+            cols_out = [cfg.COL_NUM, cfg.COL_FECHA, cfg.COL_NOMBRE,
+                        cfg.COL_VOLUMEN, cfg.COL_TIEMPO,
+                        "Coef_enucleacion", cfg.COL_REINGRESO, cfg.COL_MOT_REING, cfg.COL_CLINICA]
+            df_out = df[mask_out][cols_out].copy()
+            df_out[cfg.COL_FECHA] = df_out[cfg.COL_FECHA].dt.strftime("%d/%m/%Y")
+            df_out["Motivo alerta"] = ""
+            df_out.loc[df[cfg.COL_TIEMPO].fillna(0) > 120, "Motivo alerta"] += "⏱ Tiempo >120min  "
+            df_out.loc[df[cfg.COL_REINGRESO], "Motivo alerta"] += "🔁 Reingreso  "
+            df_out.loc[df["Coef_enucleacion"].fillna(100) < 50, "Motivo alerta"] += "📉 Coef <50%"
+            st.dataframe(df_out.reset_index(drop=True), use_container_width=True)
+
     st.markdown("---")
 
     st.markdown("""
@@ -511,6 +546,95 @@ def tab_datos(df):
         st.download_button("⬇ Descargar CSV", csv,
                            f"holep_{datetime.now().strftime('%Y%m%d')}.csv",
                            "text/csv")
+    with col2:
+        pdf_bytes = generar_pdf_resumen(df)
+        if pdf_bytes:
+            st.download_button("📄 Descargar PDF Resumen", pdf_bytes,
+                               f"resumen_holep_{datetime.now().strftime('%Y%m%d')}.pdf",
+                               "application/pdf")
+
+# ── Generador PDF resumen ───────────────────────────────────────────────────
+def generar_pdf_resumen(df) -> bytes:
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return b""
+
+    total    = int(df[cfg.COL_NUM].max()) if df[cfg.COL_NUM].notna().any() else len(df)
+    coef_med = df["Coef_enucleacion"].mean() if df["Coef_enucleacion"].notna().any() else None
+    t_prom   = df[cfg.COL_TIEMPO].mean()
+    v_prom   = df[cfg.COL_VOLUMEN].mean()
+    p_prom   = df[cfg.COL_PESO].mean()
+    reing    = int(df[cfg.COL_REINGRESO].sum())
+    incont   = int(df[cfg.COL_INCONT].sum())
+    grandes  = int((df[cfg.COL_VOLUMEN] >= 100).sum())
+    fecha_min = df[cfg.COL_FECHA].min().strftime("%d/%m/%Y") if df[cfg.COL_FECHA].notna().any() else "—"
+    fecha_max = df[cfg.COL_FECHA].max().strftime("%d/%m/%Y") if df[cfg.COL_FECHA].notna().any() else "—"
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_margins(20, 20, 20)
+
+    # Encabezado
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(31, 78, 121)
+    pdf.cell(0, 10, "Dashboard HoLEP - Serie Quirurgica Personal", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 7, "Dr. Juan Carlos Riera M.", ln=True, align="C")
+    pdf.cell(0, 6, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}  |  Periodo: {fecha_min} - {fecha_max}", ln=True, align="C")
+    pdf.ln(6)
+
+    # Linea separadora
+    pdf.set_draw_color(31, 78, 121)
+    pdf.set_line_width(0.8)
+    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+    pdf.ln(6)
+
+    # Función helper para sección
+    def seccion(titulo):
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(31, 78, 121)
+        pdf.cell(0, 8, titulo, ln=True)
+        pdf.set_text_color(40, 40, 40)
+
+    def fila(label, valor):
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(80, 7, label + ":", border=0)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 7, str(valor), ln=True)
+
+    seccion("RESUMEN ESTADISTICO GLOBAL")
+    fila("Total de cirugias", total)
+    fila("Periodo de actividad", f"{fecha_min}  -  {fecha_max}")
+    fila("Volumen prostatico medio", f"{v_prom:.1f} gr" if pd.notna(v_prom) else "—")
+    fila("Peso obtenido medio", f"{p_prom:.1f} gr" if pd.notna(p_prom) else "—")
+    fila("Tiempo quirurgico medio", f"{t_prom:.1f} min" if pd.notna(t_prom) else "—")
+    fila("Coeficiente de enucleacion medio", f"{coef_med:.1f}%" if coef_med else "—")
+    pdf.ln(4)
+
+    seccion("INDICADORES CLINICOS")
+    fila("Tasa de reingresos", f"{reing} casos ({reing/total*100:.1f}%)" if total else "0")
+    fila("Tasa de incontinencia", f"{incont} casos ({incont/total*100:.1f}%)" if total else "0")
+    fila("Prostatas >= 100 gr", f"{grandes} casos ({grandes/total*100:.1f}%)" if total else "0")
+    fila("RAO preoperatorio", f"{int(df['RPM_es_RAO'].sum())} casos")
+    fila("Litiasis vesical asociada", f"{int(df[cfg.COL_LITIASIS].sum())} casos")
+    pdf.ln(4)
+
+    seccion("DISTRIBUCION POR CLINICA")
+    for clinica, n in df[cfg.COL_CLINICA].value_counts().items():
+        fila(str(clinica), f"{n} casos ({n/total*100:.1f}%)")
+
+    pdf.ln(6)
+    pdf.set_line_width(0.4)
+    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(0, 5, "Documento de uso medico personal - Serie quirurgica privada Dr. Juan Carlos Riera M.", ln=True, align="C")
+
+    return bytes(pdf.output())
+
 
 # ── Tab 6: Chat IA ─────────────────────────────────────────────────────────
 def tab_chat(df):
