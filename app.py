@@ -194,7 +194,7 @@ def sidebar_filters(df):
 # ── Tab 1: Resumen ──────────────────────────────────────────────────────────
 def tab_resumen(df):
     # KPIs
-    total   = len(df)
+    total   = int(df[cfg.COL_NUM].max()) if df[cfg.COL_NUM].notna().any() else len(df)
     ed_prom = df[cfg.COL_EDAD].mean()
     vol_p   = df[cfg.COL_VOLUMEN].mean()
     t_prom  = df[cfg.COL_TIEMPO].mean()
