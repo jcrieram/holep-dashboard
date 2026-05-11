@@ -6,7 +6,8 @@ Carpeta con los documentos de trabajo para la postulación del proyecto **FLUORO
 
 | Archivo | Audiencia | Estado |
 |---|---|---|
-| [PROYECTO_FLUORO_HOLEP.md](./PROYECTO_FLUORO_HOLEP.md) | Documento maestro del proyecto (54 páginas equivalentes) | Borrador v1.0 |
+| [ANTEPROYECTO_FLUORO_HOLEP.md](./ANTEPROYECTO_FLUORO_HOLEP.md) | **Anteproyecto científico formal** para presentación institucional inicial (bases científicas, método, bibliografía, esquema, plan estadístico) | Borrador v1.0 |
+| [PROYECTO_FLUORO_HOLEP.md](./PROYECTO_FLUORO_HOLEP.md) | Documento maestro del proyecto (versión extensa con presupuesto, equipo, gestión) | Borrador v1.0 |
 | [RESUMEN_EJECUTIVO_ANID.md](./RESUMEN_EJECUTIVO_ANID.md) | Resumen 3 páginas para FONIS-ANID | Borrador v1.0 |
 | [CARTA_SCHU.md](./CARTA_SCHU.md) | Carta de presentación al Directorio SChU | Borrador v1.0 |
 | [CONSENTIMIENTO_INFORMADO_DRAFT.md](./CONSENTIMIENTO_INFORMADO_DRAFT.md) | Borrador de CI para el CEC | Borrador v1.0 |
